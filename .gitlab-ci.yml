@@ -1,5 +1,17 @@
 stages:
+  - prepare
   - build
+
+prepare:env:
+  stage: prepare
+  image: buildpack-deps:stable
+  script:
+    - echo "KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)" > kubectl.env
+  artifacts:
+    reports:
+      dotenv: kubectl.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 build:
   stage: build
@@ -7,6 +19,9 @@ build:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   script:
-    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --cache=true --destination eu.gcr.io/itp-gce-registry/helm-sops:$CI_COMMIT_TAG
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --cache=true --build-arg "HELM_VERSION=${HELM_VERSION}" --build-arg "KUBECTL_VERSION=${KUBECTL_VERSION}" --destination eu.gcr.io/itp-gce-registry/helm-sops:$HELM_VERSION
+  parallel:
+    matrix:
+      - HELM_VERSION: ["3.8.0", "3.8.2", "3.9.0", "latest"]
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
